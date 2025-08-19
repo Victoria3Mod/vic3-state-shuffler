@@ -8,79 +8,55 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"states-shuffler/types"
 )
 
-// State представляет регион из файла Victoria 3
-type State struct {
-	Name              string            `json:"name"`
-	ID                int               `json:"id"`
-	SubsistenceBuilding string          `json:"subsistence_building"`
-	Provinces         []string          `json:"provinces"`
-	Impassable        []string          `json:"impassable,omitempty"`
-	PrimeLand         []string          `json:"prime_land,omitempty"`
-	Traits            []string          `json:"traits"`
-	City              string            `json:"city"`
-	Port              string            `json:"port,omitempty"`
-	Farm              string            `json:"farm"`
-	Mine              string            `json:"mine,omitempty"`
-	Wood              string            `json:"wood,omitempty"`
-	ArableLand        int               `json:"arable_land"`
-	ArableResources   []string          `json:"arable_resources"`
-	CappedResources   map[string]int    `json:"capped_resources"`
-	Resource          *Resource         `json:"resource,omitempty"`
-	NavalExitID       int               `json:"naval_exit_id,omitempty"`
-}
-
-// Resource для вложенного блока resource (e.g., bg_oil_extraction)
-type Resource struct {
-	Type             string `json:"type"`
-	UndiscoveredAmount int   `json:"undiscovered_amount"`
-}
-
 func main() {
-	// Чтение файла
-	file, err := os.Open("00_west_europe.txt")
+	const inputTxt = "raw/00_west_europe.txt"
+	const outputJSON = "json/states.json"
+
+	file, err := os.Open(inputTxt)
 	if err != nil {
-		fmt.Printf("Ошибка открытия файла: %v\n", err)
+		fmt.Printf("Ошибка открытия файла %s: %v\n", inputTxt, err)
 		return
 	}
 	defer file.Close()
 
-	// Парсинг
 	states, err := parseStates(file)
 	if err != nil {
 		fmt.Printf("Ошибка парсинга: %v\n", err)
 		return
 	}
 
-	// Сериализация в JSON
 	jsonData, err := json.MarshalIndent(states, "", "  ")
 	if err != nil {
 		fmt.Printf("Ошибка сериализации в JSON: %v\n", err)
 		return
 	}
 
-	// Вывод JSON (или сохранение в файл/БД)
-	fmt.Println(string(jsonData))
-
-	// Опционально: сохранение в файл
-	err = os.WriteFile("states.json", jsonData, 0644)
-	if err != nil {
-		fmt.Printf("Ошибка записи JSON: %v\n", err)
+	if err := os.MkdirAll("json", 0755); err != nil {
+		fmt.Printf("Ошибка создания папки json: %v\n", err)
+		return
 	}
+
+	if err := os.WriteFile(outputJSON, jsonData, 0644); err != nil {
+		fmt.Printf("Ошибка записи JSON в %s: %v\n", outputJSON, err)
+		return
+	}
+
+	fmt.Printf("Парсинг завершен! JSON сохранен в %s\n", outputJSON)
 }
 
-// parseStates парсит файл в []State
-func parseStates(file *os.File) ([]State, error) {
-	var states []State
+func parseStates(file *os.File) ([]types.State, error) {
+	var states []types.State
 	scanner := bufio.NewScanner(file)
-	var currentState State
-	var currentBlock string // Для отслеживания вложенных блоков
+	var currentState types.State
+	var currentBlock string
 	inBlock := false
-	listBuffer := make([]string, 0) // Для списков provinces, traits, etc.
+	listBuffer := make([]string, 0)
 	cappedResources := make(map[string]int)
 
-	// Регулярные выражения
 	keyValRegex := regexp.MustCompile(`^(\w+)\s*=\s*"?([^"{}\s][^"{}\n]*)"?$`)
 	listStartRegex := regexp.MustCompile(`^(\w+)\s*=\s*{`)
 	listItemRegex := regexp.MustCompile(`"([^"]+)"`)
@@ -91,13 +67,12 @@ func parseStates(file *os.File) ([]State, error) {
 			continue
 		}
 
-		// Начало блока STATE_XXX
 		if strings.HasPrefix(line, "STATE_") {
 			if inBlock && currentState.Name != "" {
 				currentState.CappedResources = cappedResources
 				states = append(states, currentState)
 			}
-			currentState = State{CappedResources: make(map[string]int)}
+			currentState = types.State{CappedResources: make(map[string]int)}
 			currentBlock = ""
 			inBlock = true
 			parts := strings.Split(line, "=")
@@ -109,7 +84,6 @@ func parseStates(file *os.File) ([]State, error) {
 			continue
 		}
 
-		// Конец блока
 		if line == "}" {
 			if currentBlock == "capped_resources" {
 				currentState.CappedResources = cappedResources
@@ -132,8 +106,8 @@ func parseStates(file *os.File) ([]State, error) {
 			} else if currentBlock == "resource" {
 				if len(listBuffer) >= 2 {
 					amount, _ := strconv.Atoi(listBuffer[1])
-					currentState.Resource = &Resource{
-						Type:             listBuffer[0],
+					currentState.Resource = &types.Resource{
+						Type:              listBuffer[0],
 						UndiscoveredAmount: amount,
 					}
 				}
@@ -141,14 +115,13 @@ func parseStates(file *os.File) ([]State, error) {
 			} else {
 				currentState.CappedResources = cappedResources
 				states = append(states, currentState)
-				currentState = State{CappedResources: make(map[string]int)}
+				currentState = types.State{CappedResources: make(map[string]int)}
 				inBlock = false
 			}
 			currentBlock = ""
 			continue
 		}
 
-		// Парсинг ключ-значение
 		if matches := keyValRegex.FindStringSubmatch(line); len(matches) == 3 {
 			key, value := matches[1], matches[2]
 			switch currentBlock {
@@ -183,14 +156,12 @@ func parseStates(file *os.File) ([]State, error) {
 			continue
 		}
 
-		// Начало списка
 		if matches := listStartRegex.FindStringSubmatch(line); len(matches) == 2 {
 			currentBlock = matches[1]
 			listBuffer = make([]string, 0)
 			continue
 		}
 
-		// Элементы списка (provinces, traits, etc.)
 		if currentBlock != "" {
 			for _, match := range listItemRegex.FindAllStringSubmatch(line, -1) {
 				listBuffer = append(listBuffer, match[1])
@@ -198,7 +169,6 @@ func parseStates(file *os.File) ([]State, error) {
 		}
 	}
 
-	// Добавляем последний регион
 	if inBlock && currentState.Name != "" {
 		currentState.CappedResources = cappedResources
 		states = append(states, currentState)
