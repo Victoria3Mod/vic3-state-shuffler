@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"states-shuffler/types"
+	"states-shuffler/internal/types"
 )
 
 func main() {

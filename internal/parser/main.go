@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"states-shuffler/types"
+	"states-shuffler/internal/types"
 )
 
 func main() {
@@ -107,7 +107,7 @@ func parseStates(file *os.File) ([]types.State, error) {
 				if len(listBuffer) >= 2 {
 					amount, _ := strconv.Atoi(listBuffer[1])
 					currentState.Resource = &types.Resource{
-						Type:              listBuffer[0],
+						Type:               listBuffer[0],
 						UndiscoveredAmount: amount,
 					}
 				}
