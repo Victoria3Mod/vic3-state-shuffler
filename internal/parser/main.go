@@ -13,17 +13,29 @@ import (
 )
 
 func main() {
-	const inputTxt = "raw/00_west_europe.txt"
+	const inputDir = "D:\\Games\\Steam\\steamapps\\common\\Victoria 3\\game\\map_data\\state_regions"
 	const outputJSON = "json/states.json"
 
-	file, err := os.Open(inputTxt)
-	if err != nil {
-		fmt.Printf("Ошибка открытия файла %s: %v\n", inputTxt, err)
-		return
-	}
-	defer file.Close()
+	var states []types.State
 
-	states, err := parseStates(file)
+	dirEntries, err := os.ReadDir(inputDir)
+
+	for _, dirEntry := range dirEntries {
+		if dirEntry.IsDir() {
+			continue
+		}
+
+		fileName := inputDir + "/" + dirEntry.Name()
+		file, err := os.Open(fileName)
+
+		if err != nil {
+			fmt.Printf("Ошибка открытия файла %s: %v\n", fileName, err)
+			return
+		}
+
+		states, err = parseStates(file, states)
+	}
+
 	if err != nil {
 		fmt.Printf("Ошибка парсинга: %v\n", err)
 		return
@@ -48,8 +60,7 @@ func main() {
 	fmt.Printf("Парсинг завершен! JSON сохранен в %s\n", outputJSON)
 }
 
-func parseStates(file *os.File) ([]types.State, error) {
-	var states []types.State
+func parseStates(file *os.File, states []types.State) ([]types.State, error) {
 	scanner := bufio.NewScanner(file)
 	var currentState types.State
 	var currentBlock string
