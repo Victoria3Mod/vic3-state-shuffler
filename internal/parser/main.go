@@ -21,7 +21,7 @@ func main() {
 	dirEntries, err := os.ReadDir(inputDir)
 
 	for _, dirEntry := range dirEntries {
-		if dirEntry.IsDir() {
+		if dirEntry.IsDir() || dirEntry.Name() == "99_seas.txt" {
 			continue
 		}
 
@@ -34,6 +34,7 @@ func main() {
 		}
 
 		states, err = parseStates(file, states)
+
 	}
 
 	if err != nil {
