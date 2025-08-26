@@ -33,8 +33,9 @@ func main() {
 		file, err := os.Open(fileName)
 		if err != nil {
 			fmt.Printf("Ошибка открытия файла %s: %v\n", fileName, err)
-			continue // Продолжить со следующим файлом
+			continue
 		}
+		defer file.Close()
 
 		states, err = parseStates(file, states)
 		if err != nil {
@@ -80,7 +81,12 @@ func parseStates(file *os.File, states []types.State) ([]types.State, error) {
 	listItemRegex := regexp.MustCompile(`"([^"]+)"`)
 
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		line := scanner.Text()
+		// Удаление UTF-8 BOM, если присутствует
+		if strings.HasPrefix(line, "\ufeff") {
+			line = strings.TrimPrefix(line, "\ufeff")
+		}
+		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
