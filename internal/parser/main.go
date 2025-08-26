@@ -19,6 +19,10 @@ func main() {
 	var states []types.State
 
 	dirEntries, err := os.ReadDir(inputDir)
+	if err != nil {
+		fmt.Printf("Ошибка чтения директории %s: %v\n", inputDir, err)
+		return
+	}
 
 	for _, dirEntry := range dirEntries {
 		if dirEntry.IsDir() || dirEntry.Name() == "99_seas.txt" {
@@ -27,18 +31,20 @@ func main() {
 
 		fileName := inputDir + "/" + dirEntry.Name()
 		file, err := os.Open(fileName)
-
 		if err != nil {
 			fmt.Printf("Ошибка открытия файла %s: %v\n", fileName, err)
-			return
+			continue // Продолжить со следующим файлом
 		}
 
 		states, err = parseStates(file, states)
-
+		if err != nil {
+			fmt.Printf("Ошибка парсинга %s: %v\n", fileName, err)
+			continue
+		}
 	}
 
-	if err != nil {
-		fmt.Printf("Ошибка парсинга: %v\n", err)
+	if len(states) == 0 {
+		fmt.Println("Не удалось распарсить ни одного региона")
 		return
 	}
 
@@ -171,6 +177,32 @@ func parseStates(file *os.File, states []types.State) ([]types.State, error) {
 		if matches := listStartRegex.FindStringSubmatch(line); len(matches) == 2 {
 			currentBlock = matches[1]
 			listBuffer = make([]string, 0)
+			// Обработка списка в одной строке
+			if strings.Contains(line, "}") {
+				// Извлечь содержимое между { и }
+				startIdx := strings.Index(line, "{") + 1
+				endIdx := strings.Index(line, "}")
+				if startIdx > 0 && endIdx > startIdx {
+					listContent := strings.TrimSpace(line[startIdx:endIdx])
+					for _, match := range listItemRegex.FindAllStringSubmatch(listContent, -1) {
+						listBuffer = append(listBuffer, match[1])
+					}
+					switch currentBlock {
+					case "provinces":
+						currentState.Provinces = listBuffer
+					case "traits":
+						currentState.Traits = listBuffer
+					case "impassable":
+						currentState.Impassable = listBuffer
+					case "prime_land":
+						currentState.PrimeLand = listBuffer
+					case "arable_resources":
+						currentState.ArableResources = listBuffer
+					}
+					listBuffer = make([]string, 0)
+					currentBlock = ""
+				}
+			}
 			continue
 		}
 
