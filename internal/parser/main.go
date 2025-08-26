@@ -16,7 +16,7 @@ func main() {
 	const inputDir = "D:\\Games\\Steam\\steamapps\\common\\Victoria 3\\game\\map_data\\state_regions"
 	const outputJSON = "json/states.json"
 
-	var states []types.State
+	states := make(map[string][]types.State)
 
 	dirEntries, err := os.ReadDir(inputDir)
 	if err != nil {
@@ -37,7 +37,7 @@ func main() {
 		}
 		defer file.Close()
 
-		states, err = parseStates(file, states)
+		states, err = parseStates(file, states, dirEntry.Name())
 		if err != nil {
 			fmt.Printf("Ошибка парсинга %s: %v\n", fileName, err)
 			continue
@@ -68,7 +68,7 @@ func main() {
 	fmt.Printf("Парсинг завершен! JSON сохранен в %s\n", outputJSON)
 }
 
-func parseStates(file *os.File, states []types.State) ([]types.State, error) {
+func parseStates(file *os.File, states map[string][]types.State, fileName string) (map[string][]types.State, error) {
 	scanner := bufio.NewScanner(file)
 	var currentState types.State
 	var currentBlock string
@@ -94,7 +94,7 @@ func parseStates(file *os.File, states []types.State) ([]types.State, error) {
 		if strings.HasPrefix(line, "STATE_") {
 			if inBlock && currentState.Name != "" {
 				currentState.CappedResources = cappedResources
-				states = append(states, currentState)
+				states[fileName] = append(states[fileName], currentState)
 			}
 			currentState = types.State{CappedResources: make(map[string]int)}
 			currentBlock = ""
@@ -138,7 +138,7 @@ func parseStates(file *os.File, states []types.State) ([]types.State, error) {
 				listBuffer = make([]string, 0)
 			} else {
 				currentState.CappedResources = cappedResources
-				states = append(states, currentState)
+				states[fileName] = append(states[fileName], currentState)
 				currentState = types.State{CappedResources: make(map[string]int)}
 				inBlock = false
 			}
@@ -221,7 +221,7 @@ func parseStates(file *os.File, states []types.State) ([]types.State, error) {
 
 	if inBlock && currentState.Name != "" {
 		currentState.CappedResources = cappedResources
-		states = append(states, currentState)
+		states[fileName] = append(states[fileName], currentState)
 	}
 
 	return states, scanner.Err()
